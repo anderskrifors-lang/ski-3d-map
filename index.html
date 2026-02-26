@@ -1130,16 +1130,25 @@
         }
 
         function flyToResort() {
+            // Low angle view to see 3D terrain
             viewer.camera.flyTo({
-                destination: Cesium.Cartesian3.fromDegrees(currentResort.lon, currentResort.lat, 15000),
+                destination: Cesium.Cartesian3.fromDegrees(
+                    currentResort.lon - 0.02, 
+                    currentResort.lat - 0.02, 
+                    5000  // Lower altitude
+                ),
                 orientation: {
-                    heading: Cesium.Math.toRadians(0),
-                    pitch: Cesium.Math.toRadians(-45),
+                    heading: Cesium.Math.toRadians(45),  // Angled view
+                    pitch: Cesium.Math.toRadians(-25),   // More horizontal to see hills
                     roll: 0
                 },
                 duration: 2
             });
             updateStatus(`Flyger till ${currentResort.name}...`);
+            
+            // Log terrain status
+            console.log('Terrain provider:', viewer.terrainProvider?.constructor?.name);
+            console.log('Globe terrain exaggeration:', viewer.scene.verticalExaggeration);
         }
 
         // ============= PISTES =============
