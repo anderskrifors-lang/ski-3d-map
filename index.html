@@ -1086,12 +1086,65 @@
                 // Hide loading
                 document.getElementById('loading').classList.add('hidden');
                 
-                // Load first resort
-                selectResort('are');
+                // Try GPS position first, then fall back to default resort
+                initWithGPS();
                 
             } catch (error) {
                 console.error('Init error:', error);
                 document.querySelector('.loader-text').textContent = 'Fel: ' + error.message;
+            }
+        }
+
+        // ============= GPS POSITIONING =============
+        function initWithGPS() {
+            if ('geolocation' in navigator) {
+                document.querySelector('.loader-text').textContent = 'Hämtar din position...';
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const userLat = position.coords.latitude;
+                        const userLon = position.coords.longitude;
+                        console.log('GPS position:', userLat, userLon);
+                        
+                        // Find nearest resort
+                        let nearestResort = 'are';
+                        let minDistance = Infinity;
+                        
+                        for (const [id, resort] of Object.entries(skiResorts)) {
+                            const dist = Math.sqrt(
+                                Math.pow(resort.lat - userLat, 2) + 
+                                Math.pow(resort.lon - userLon, 2)
+                            );
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                nearestResort = id;
+                            }
+                        }
+                        
+                        console.log('Nearest resort:', nearestResort);
+                        selectResort(nearestResort);
+                        
+                        // Fly to user's actual position first, then to resort
+                        viewer.camera.flyTo({
+                            destination: Cesium.Cartesian3.fromDegrees(userLon, userLat, 8000),
+                            orientation: {
+                                heading: Cesium.Math.toRadians(0),
+                                pitch: Cesium.Math.toRadians(-35),
+                                roll: 0
+                            },
+                            duration: 1.5
+                        });
+                        
+                        updateStatus(`📍 Din position → ${skiResorts[nearestResort].name}`);
+                    },
+                    (error) => {
+                        console.log('GPS error:', error.message);
+                        // Fall back to default resort
+                        selectResort('are');
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
+            } else {
+                selectResort('are');
             }
         }
 
