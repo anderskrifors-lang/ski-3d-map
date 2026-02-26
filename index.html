@@ -1031,23 +1031,10 @@
         // ============= INIT =============
         async function initMap() {
             try {
-                let terrainProvider;
+                console.log('Token present:', !!CESIUM_ION_TOKEN);
                 
-                if (CESIUM_ION_TOKEN) {
-                    console.log('Loading Cesium World Terrain with token...');
-                    try {
-                        terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
-                        console.log('Terrain loaded successfully!');
-                    } catch (terrainError) {
-                        console.error('Terrain load failed:', terrainError);
-                        terrainProvider = new Cesium.EllipsoidTerrainProvider();
-                    }
-                } else {
-                    terrainProvider = new Cesium.EllipsoidTerrainProvider();
-                }
-                
+                // Create viewer first with no terrain
                 viewer = new Cesium.Viewer('cesiumContainer', {
-                    terrainProvider: terrainProvider,
                     baseLayerPicker: false,
                     geocoder: false,
                     homeButton: false,
@@ -1060,6 +1047,17 @@
                     infoBox: false,
                     selectionIndicator: false
                 });
+                
+                // Set 3D World Terrain
+                if (CESIUM_ION_TOKEN) {
+                    console.log('Setting Cesium World Terrain...');
+                    try {
+                        viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
+                        console.log('3D Terrain active!');
+                    } catch (terrainError) {
+                        console.error('Terrain failed:', terrainError);
+                    }
+                }
                 
                 viewer.imageryLayers.removeAll();
                 
