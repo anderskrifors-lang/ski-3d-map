@@ -511,7 +511,9 @@
 
     <script>
         // ============= CONFIGURATION =============
-        const CESIUM_ION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYTJiOTk4YS1mMjZhLTQ0OGItYWM5OS03MGM2OTViMWZmMzIiLCJpZCI6MjA3NDIsInNjb3BlcyI6WyJhc3IiLCJnYyJdLCJpYXQiOjE1NzgyNTQwMTV9.FGQKb-FQYKAhCRvlRnFu0q-GjCZjDvJ3X_WV1_3NRHY';
+        // Cesium Ion token - sätt din egen från https://cesium.com/ion/ för full 3D-terräng
+        // Lämna null för att använda öppna datakällor (platt karta men fungerar utan konto)
+        const CESIUM_ION_TOKEN = null;
         
         // ============= SKI RESORTS DATA =============
         const skiResorts = {
@@ -622,7 +624,9 @@
         };
         
         // ============= GLOBALS =============
-        Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN;
+        if (CESIUM_ION_TOKEN) {
+            Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN;
+        }
         let viewer;
         let pisteEntities = [];
         let poiEntities = [];
@@ -722,8 +726,18 @@
             updateStatus('Skapar 3D-vy...');
             
             try {
+                let terrainProvider;
+                
+                if (CESIUM_ION_TOKEN) {
+                    // Använd Cesium Ion terrain (kräver token)
+                    terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
+                } else {
+                    // Använd ellipsoid (platt) - fungerar utan token
+                    terrainProvider = new Cesium.EllipsoidTerrainProvider();
+                }
+                
                 viewer = new Cesium.Viewer('cesiumContainer', {
-                    terrainProvider: await Cesium.CesiumTerrainProvider.fromIonAssetId(1),
+                    terrainProvider: terrainProvider,
                     baseLayerPicker: false,
                     geocoder: false,
                     homeButton: false,
@@ -738,7 +752,19 @@
                 });
                 
                 viewer.imageryLayers.removeAll();
-                viewer.imageryLayers.addImageryProvider(await Cesium.IonImageryProvider.fromAssetId(3));
+                
+                if (CESIUM_ION_TOKEN) {
+                    // Cesium Ion Bing imagery
+                    viewer.imageryLayers.addImageryProvider(await Cesium.IonImageryProvider.fromAssetId(3));
+                } else {
+                    // Öppen OpenStreetMap imagery
+                    viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+                        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        subdomains: ['a', 'b', 'c'],
+                        credit: '© OpenStreetMap contributors',
+                        maximumLevel: 19
+                    }));
+                }
                 viewer.scene.globe.depthTestAgainstTerrain = true;
                 
                 document.getElementById('loading').style.display = 'none';
