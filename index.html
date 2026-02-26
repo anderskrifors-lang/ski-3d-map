@@ -1032,9 +1032,22 @@
         async function initMap() {
             try {
                 console.log('Token present:', !!CESIUM_ION_TOKEN);
+                console.log('Cesium version:', Cesium.VERSION);
                 
-                // Create viewer first with no terrain
+                // Set up terrain provider FIRST
+                let terrainProvider;
+                if (CESIUM_ION_TOKEN) {
+                    console.log('Loading Cesium World Terrain...');
+                    terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(1, {
+                        requestVertexNormals: true,
+                        requestWaterMask: true
+                    });
+                    console.log('Terrain provider ready:', terrainProvider.ready);
+                }
+                
+                // Create viewer WITH terrain
                 viewer = new Cesium.Viewer('cesiumContainer', {
+                    terrainProvider: terrainProvider,
                     baseLayerPicker: false,
                     geocoder: false,
                     homeButton: false,
@@ -1048,21 +1061,13 @@
                     selectionIndicator: false
                 });
                 
-                // Set 3D World Terrain
-                if (CESIUM_ION_TOKEN) {
-                    console.log('Setting Cesium World Terrain...');
-                    try {
-                        viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
-                        console.log('3D Terrain active!');
-                    } catch (terrainError) {
-                        console.error('Terrain failed:', terrainError);
-                    }
-                }
+                console.log('Viewer created, terrain:', viewer.terrainProvider.constructor.name);
                 
                 viewer.imageryLayers.removeAll();
                 
                 if (CESIUM_ION_TOKEN) {
-                    viewer.imageryLayers.addImageryProvider(await Cesium.IonImageryProvider.fromAssetId(3));
+                    viewer.imageryLayers.addImageryProvider(await Cesium.IonImageryProvider.fromAssetId(2)); // Bing Maps Aerial
+                    console.log('Bing Maps imagery loaded');
                 } else {
                     viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
                         url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -1073,9 +1078,10 @@
                 }
                 
                 viewer.scene.globe.depthTestAgainstTerrain = true;
+                viewer.scene.globe.enableLighting = true;
                 
                 // Terrain exaggeration for more dramatic 3D effect
-                viewer.scene.verticalExaggeration = 1.5;
+                viewer.scene.verticalExaggeration = 2.0;
                 
                 // Hide loading
                 document.getElementById('loading').classList.add('hidden');
