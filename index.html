@@ -1267,13 +1267,14 @@
                     const coords = way.nodes.map(id => nodes[id]).filter(c => c);
                     if (coords.length < 2) return;
                     
-                    const positions = coords.flatMap(c => [c[0], c[1], currentResort.summitAlt * 0.7]);
+                    const positions = coords.flatMap(c => [c[0], c[1]]);
                     
                     if (way.tags && way.tags.aerialway) {
-                        // Lift
+                        // Lift - keep elevated (not clamped to ground)
+                        const liftPositions = coords.flatMap(c => [c[0], c[1], currentResort.summitAlt * 0.8]);
                         const entity = viewer.entities.add({
                             polyline: {
-                                positions: Cesium.Cartesian3.fromDegreesArrayHeights(positions),
+                                positions: Cesium.Cartesian3.fromDegreesArrayHeights(liftPositions),
                                 width: 3,
                                 material: new Cesium.PolylineDashMaterialProperty({
                                     color: Cesium.Color.fromCssColorString('#fbbf24')
@@ -1286,16 +1287,16 @@
                         liftEntities.push(entity);
                         liftCount++;
                     } else {
-                        // Piste
+                        // Piste - clamp to terrain surface
                         const difficulty = way.tags['piste:difficulty'] || 'unknown';
                         const color = difficultyColors[difficulty] || difficultyColors.unknown;
                         
                         const entity = viewer.entities.add({
                             polyline: {
-                                positions: Cesium.Cartesian3.fromDegreesArrayHeights(positions),
+                                positions: Cesium.Cartesian3.fromDegreesArray(positions),
                                 width: 4,
                                 material: color,
-                                clampToGround: false
+                                clampToGround: true
                             },
                             name: way.tags.name || `Pist (${difficulty})`,
                             show: showPistes
