@@ -1034,7 +1034,14 @@
                 let terrainProvider;
                 
                 if (CESIUM_ION_TOKEN) {
-                    terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
+                    console.log('Loading Cesium World Terrain with token...');
+                    try {
+                        terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(1);
+                        console.log('Terrain loaded successfully!');
+                    } catch (terrainError) {
+                        console.error('Terrain load failed:', terrainError);
+                        terrainProvider = new Cesium.EllipsoidTerrainProvider();
+                    }
                 } else {
                     terrainProvider = new Cesium.EllipsoidTerrainProvider();
                 }
@@ -1068,6 +1075,9 @@
                 }
                 
                 viewer.scene.globe.depthTestAgainstTerrain = true;
+                
+                // Terrain exaggeration for more dramatic 3D effect
+                viewer.scene.verticalExaggeration = 1.5;
                 
                 // Hide loading
                 document.getElementById('loading').classList.add('hidden');
