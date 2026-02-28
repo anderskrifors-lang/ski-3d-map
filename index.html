@@ -1083,20 +1083,32 @@
                 
                 viewer.imageryLayers.removeAll();
                 
-                if (CESIUM_ION_TOKEN) {
-                    viewer.imageryLayers.addImageryProvider(await Cesium.IonImageryProvider.fromAssetId(2)); // Bing Maps Aerial
-                    console.log('Bing Maps imagery loaded');
-                } else {
-                    viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
-                        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        subdomains: ['a', 'b', 'c'],
-                        credit: '© OpenStreetMap',
-                        maximumLevel: 19
-                    }));
-                }
+                // Winter/snow satellite imagery (Esri World Imagery + snow tint)
+                const baseLayer = viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+                    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                    credit: '© Esri',
+                    maximumLevel: 19
+                }));
+                
+                // Apply winter/snow tint to make terrain look snowy
+                baseLayer.brightness = 1.3;
+                baseLayer.saturation = 0.4;  // Desaturate for snow look
+                baseLayer.contrast = 1.1;
+                
+                console.log('Winter imagery loaded with snow tint');
                 
                 viewer.scene.globe.depthTestAgainstTerrain = true;
                 viewer.scene.globe.enableLighting = true;
+                
+                // Winter atmosphere settings
+                viewer.scene.skyAtmosphere.hueShift = -0.05;  // Cooler tint
+                viewer.scene.skyAtmosphere.saturationShift = -0.2;  // Less saturated
+                viewer.scene.skyAtmosphere.brightnessShift = 0.2;  // Brighter (snow glare)
+                
+                // Winter fog for atmosphere
+                viewer.scene.fog.enabled = true;
+                viewer.scene.fog.density = 0.00008;
+                viewer.scene.fog.minimumBrightness = 0.2;
                 
                 // Terrain exaggeration for more dramatic 3D effect
                 viewer.scene.verticalExaggeration = 2.0;
@@ -1272,35 +1284,99 @@
                     if (way.tags && way.tags.aerialway) {
                         // Lift - keep elevated (not clamped to ground)
                         const liftPositions = coords.flatMap(c => [c[0], c[1], currentResort.summitAlt * 0.8]);
+                        const liftName = way.tags.name || '';
                         const entity = viewer.entities.add({
                             polyline: {
                                 positions: Cesium.Cartesian3.fromDegreesArrayHeights(liftPositions),
-                                width: 3,
+                                width: 4,
                                 material: new Cesium.PolylineDashMaterialProperty({
                                     color: Cesium.Color.fromCssColorString('#fbbf24')
                                 }),
                                 clampToGround: false
                             },
-                            name: way.tags.name || 'Lift',
+                            name: liftName || 'Lift',
                             show: showLifts
                         });
+                        
+                        // Add lift name label at midpoint
+                        if (liftName && coords.length >= 2) {
+                            const midIdx = Math.floor(coords.length / 2);
+                            const labelEntity = viewer.entities.add({
+                                position: Cesium.Cartesian3.fromDegrees(coords[midIdx][0], coords[midIdx][1], currentResort.summitAlt * 0.8 + 50),
+                                label: {
+                                    text: '🚡 ' + liftName,
+                                    font: '12px Inter, sans-serif',
+                                    fillColor: Cesium.Color.WHITE,
+                                    outlineColor: Cesium.Color.BLACK,
+                                    outlineWidth: 3,
+                                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                                    verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                                    pixelOffset: new Cesium.Cartesian2(0, -10),
+                                    disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                                    scaleByDistance: new Cesium.NearFarScalar(500, 1.2, 8000, 0.4)
+                                },
+                                show: showLifts
+                            });
+                            liftEntities.push(labelEntity);
+                        }
+                        
                         liftEntities.push(entity);
                         liftCount++;
                     } else {
-                        // Piste - clamp to terrain surface
+                        // Piste - clamp to terrain surface with difficulty colors
                         const difficulty = way.tags['piste:difficulty'] || 'unknown';
                         const color = difficultyColors[difficulty] || difficultyColors.unknown;
+                        const pisteName = way.tags.name || way.tags.ref || '';
+                        
+                        // Get difficulty emoji for label
+                        const diffEmoji = {
+                            'novice': '🟢',
+                            'easy': '🟢', 
+                            'intermediate': '🔵',
+                            'advanced': '🔴',
+                            'expert': '⚫',
+                            'freeride': '🟣'
+                        }[difficulty] || '🟡';
                         
                         const entity = viewer.entities.add({
                             polyline: {
                                 positions: Cesium.Cartesian3.fromDegreesArray(positions),
-                                width: 4,
-                                material: color,
+                                width: 6,  // Thicker for visibility
+                                material: new Cesium.PolylineOutlineMaterialProperty({
+                                    color: color,
+                                    outlineWidth: 2,
+                                    outlineColor: Cesium.Color.WHITE.withAlpha(0.7)
+                                }),
                                 clampToGround: true
                             },
-                            name: way.tags.name || `Pist (${difficulty})`,
+                            name: pisteName || `Pist (${difficulty})`,
                             show: showPistes
                         });
+                        
+                        // Add piste name label at midpoint
+                        if (pisteName && coords.length >= 2) {
+                            const midIdx = Math.floor(coords.length / 2);
+                            const labelEntity = viewer.entities.add({
+                                position: Cesium.Cartesian3.fromDegrees(coords[midIdx][0], coords[midIdx][1]),
+                                label: {
+                                    text: diffEmoji + ' ' + pisteName,
+                                    font: 'bold 13px Inter, sans-serif',
+                                    fillColor: Cesium.Color.WHITE,
+                                    outlineColor: color,
+                                    outlineWidth: 4,
+                                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                                    verticalOrigin: Cesium.VerticalOrigin.CENTER,
+                                    horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                                    pixelOffset: new Cesium.Cartesian2(0, 0),
+                                    disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                                    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+                                    scaleByDistance: new Cesium.NearFarScalar(300, 1.3, 6000, 0.3)
+                                },
+                                show: showPistes
+                            });
+                            pisteEntities.push(labelEntity);
+                        }
+                        
                         pisteEntities.push(entity);
                         pisteCount++;
                     }
